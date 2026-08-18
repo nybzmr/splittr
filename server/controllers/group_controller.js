@@ -15,6 +15,14 @@ async function uniqueInviteCode() {
   return code;
 }
 
+async function ensureUserDebt(groupId, username) {
+  await userDebtModel.updateOne(
+    { groupId, username },
+    { $setOnInsert: { groupId, username, netDebt: 0 } },
+    { upsert: true },
+  );
+}
+
 async function getGroupForUser(groupId, userId) {
   const group = await groupModel.findOne({ _id: groupId, members: userId }).populate("members", "username firstName lastName");
   if (!group) {
@@ -43,7 +51,7 @@ exports.createGroup = async (request, response) => {
     inviteCode,
   });
 
-  await userDebtModel.create({ groupId: group._id, username: request.user.username, netDebt: 0 });
+  await ensureUserDebt(group._id, request.user.username);
   response.status(201).json(group);
 };
 
@@ -60,7 +68,7 @@ exports.joinGroup = async (request, response) => {
 
   group.members.push(request.user._id);
   await group.save();
-  await userDebtModel.create({ groupId: group._id, username: request.user.username, netDebt: 0 });
+  await ensureUserDebt(group._id, request.user.username);
   response.json(group);
 };
 

@@ -109,3 +109,10 @@ This avoids floating-point errors when updating financial state.
 This version introduces group-scoped financial data. Existing databases created
 by the earlier global-ledger version need migration or a fresh database before
 running this version.
+
+
+## Existing MongoDB database after group support
+
+The server now runs `syncIndexes()` for the group-aware collections on startup. This removes obsolete pre-group unique indexes (for example a global `username` or `(from,to)` index) and creates the current compound indexes scoped by `groupId`.
+
+Restart the backend after updating to this version. For this college project, keep a backup of the development database before applying schema/index changes.

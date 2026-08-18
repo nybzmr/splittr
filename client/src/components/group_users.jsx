@@ -30,9 +30,12 @@ function GroupUsers(props) {
     await props.onClearDebt(debt);
   }
 
+  const hasSmartSplitResult = props.group.optimisedDebts.length > 0;
+  const smartSplitDisabled = !hasSmartSplitResult && props.group.debts.length === 0;
+
   return <section className="panel members-panel">
-    <div className="panel-header members-header"><div><span className="eyebrow">Balances</span><h2>Group members</h2><p>See who owes you and settle directly.</p></div><label className="smart-toggle"><span>Smart Split</span><input type="checkbox" checked={props.isOptimised} onChange={(e) => props.onToggle(e.target.checked)} /><span className="toggle-track"><span /></span></label></div>
-    {props.isOptimised && <div className="smart-summary"><div><span>Current</span><strong>{props.group.debts.length}</strong><small>payments</small></div><div className="smart-arrow">→</div><div><span>Optimized</span><strong>{props.group.optimisedDebts.length}</strong><small>payments</small></div><div className="smart-note">Smart Split reduces the number of transfers needed to settle the group.</div></div>}
+    <div className="panel-header members-header"><div><span className="eyebrow">Balances</span><h2>Group members</h2><p>See who owes you and settle directly.</p></div><label className={`smart-toggle ${smartSplitDisabled ? "disabled" : ""}`} title={smartSplitDisabled ? "Add an expense before using Smart Split." : "View this group's optimized settlement plan"}><span>Smart Split</span><input type="checkbox" checked={props.isOptimised} disabled={smartSplitDisabled} onChange={(e) => props.onToggle(e.target.checked)} /><span className="toggle-track"><span /></span></label></div>
+    {props.isOptimised && hasSmartSplitResult && <div className="smart-summary"><div><span>Current</span><strong>{props.group.debts.length}</strong><small>payments</small></div><div className="smart-arrow">→</div><div><span>Optimized</span><strong>{props.group.optimisedDebts.length}</strong><small>payments</small></div><div className="smart-note">Smart Split reduces the number of transfers needed to settle the group.</div></div>}
 
     {!props.isOptimised && settleableUsers.length > 0 && <div className="settle-card"><div><span className="eyebrow">Settle a debt</span><strong>{selectedUser} owes you {selectedDebt ? formatMoney(selectedDebt.amount) : ""}</strong></div><div className="settle-form"><select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>{settleableUsers.map((u) => <option key={u.username}>{u.username}</option>)}</select><input value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} type="number" min="0.01" step="0.01" placeholder="Amount" /><button className="button button-primary" disabled={!canSettle || busy} onClick={settleUp}>{busy ? "Saving…" : "Settle"}</button></div></div>}
 

@@ -3,6 +3,7 @@ require("dotenv").config();
 
 const { createApp } = require("./app");
 const { getServerConfig } = require("./config");
+const { syncDatabaseIndexes } = require("./startup/indexes");
 
 async function startServer() {
   const config = getServerConfig();
@@ -18,6 +19,7 @@ async function startServer() {
   });
 
   await mongoose.connect(config.mongoDB);
+  await syncDatabaseIndexes();
 
   return app.listen(config.port, () => {
     console.log(`Server is running at port ${config.port}.`);

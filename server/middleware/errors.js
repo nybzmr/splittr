@@ -33,7 +33,29 @@ function errorHandler(error, _, response, next) {
   }
 
   if (error.code === 11000) {
-    response.status(409).json({ error: "Resource already exists." });
+    const keyPattern = error.keyPattern || {};
+    const duplicateFields = Object.keys(keyPattern);
+
+    if (duplicateFields.includes("inviteCode")) {
+      response.status(409).json({ error: "Invite code collision. Please retry creating the group." });
+      return;
+    }
+
+    if (duplicateFields.includes("username") && duplicateFields.includes("groupId")) {
+      response.status(409).json({ error: "This user already has a balance record for this group. The database indexes may need migration." });
+      return;
+    }
+
+    if (duplicateFields.includes("from") && duplicateFields.includes("to") && duplicateFields.includes("groupId")) {
+      response.status(409).json({ error: "This debt already exists. Refresh the group and try again." });
+      return;
+    }
+
+    response.status(409).json({
+      error: duplicateFields.length
+        ? `Duplicate resource: ${duplicateFields.join(", ")}.`
+        : "Resource already exists.",
+    });
     return;
   }
 
