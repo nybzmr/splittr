@@ -15,6 +15,7 @@ function getServerConfig(env = process.env) {
     corsOrigin: env.CORS_ORIGIN || "http://localhost:3000",
     mongoDB: env.MONGODB_URI,
     port: parsePort(env.PORT || "3001"),
+    jwtSecret: env.JWT_SECRET || "dev-only-change-me",
   };
 }
 

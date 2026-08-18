@@ -46,3 +46,5 @@
   font-family: "Dongle", sans-serif;
   font-size: 30px;
 }
+
+.header-left,.header-actions{display:flex;align-items:center;gap:10px}.header-actions{margin-right:24px;font:14px Poppins,sans-serif;color:#39444e}.header-button{border:0;background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;color:#39444e;box-shadow:0 5px 18px rgba(50,50,93,.08)}.app-message{font:14px Poppins,sans-serif;text-align:center;color:#39444e}.invite-banner{width:fit-content;max-width:90%;margin:0 auto 20px;padding:10px 14px;border-radius:10px;background:#fff;box-shadow:0 8px 25px rgba(50,50,93,.08);font:13px Poppins,sans-serif;color:#39444e}.invite-banner span{color:#6b7280}@media(max-width:900px){.main-content-container{flex-direction:column;gap:20px}.title{margin:auto}.header-container{padding:8px 12px;box-sizing:border-box}.header-actions{margin-right:0}.group-expenses-container,.group-members-container{width:min(30em,92vw)}}

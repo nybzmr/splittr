@@ -6,6 +6,7 @@ const { getServerConfig } = require("./config");
 
 async function startServer() {
   const config = getServerConfig();
+  process.env.JWT_SECRET = config.jwtSecret;
   const app = createApp({ corsOrigin: config.corsOrigin });
 
   mongoose.connection.on(

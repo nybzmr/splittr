@@ -2,33 +2,15 @@ const express = require("express");
 const debtController = require("../controllers/debt_controller");
 const { asyncHandler, errorHandler } = require("../middleware/errors");
 const { validateDebt } = require("../middleware/validation");
+const { requireAuth } = require("../middleware/auth");
+const { ensureGroupMember } = require("../controllers/group_controller");
 const app = express();
 
-// Get a list of all debts.
-app.get("/debts", asyncHandler(debtController.getDebts));
-
-// Get a list of all optimised debts.
-app.get("/optimisedDebts", asyncHandler(debtController.getOptimisedDebts));
-
-// Get a debt by lender and borrower.
-app.get("/debts/:from/:to", asyncHandler(debtController.getDebtBetweenUsers));
-
-// Add a new debt between two users.
-app.post("/debts/add", validateDebt, asyncHandler(debtController.addDebt));
-
-// Settle a debt between two users.
-app.post(
-  "/debts/settle",
-  validateDebt,
-  asyncHandler(debtController.settleDebt),
-);
-
-// Delete a debt between a lender and borrower.
-app.delete(
-  "/debts/:from/:to",
-  asyncHandler(debtController.deleteDebtBetweenUsers),
-);
-
+app.use(requireAuth);
+app.get("/groups/:groupId/debts", ensureGroupMember, asyncHandler(debtController.getDebts));
+app.get("/groups/:groupId/optimisedDebts", ensureGroupMember, asyncHandler(debtController.getOptimisedDebts));
+app.post("/groups/:groupId/debts/add", ensureGroupMember, validateDebt, asyncHandler(debtController.addDebt));
+app.post("/groups/:groupId/debts/settle", ensureGroupMember, validateDebt, asyncHandler(debtController.settleDebt));
+app.delete("/groups/:groupId/debts/:from/:to", ensureGroupMember, asyncHandler(debtController.deleteDebtBetweenUsers));
 app.use(errorHandler);
-
 module.exports = app;

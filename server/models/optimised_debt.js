@@ -1,8 +1,12 @@
 const mongoose = require("mongoose");
 
-// Create a copy of the debt schema to store debts after they have been
-// simplified to minimise the total number of transactions.
 const optimisedDebtSchema = new mongoose.Schema({
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "group",
+    required: true,
+    index: true,
+  },
   from: {
     type: String,
     lowercase: true,
@@ -22,6 +26,6 @@ const optimisedDebtSchema = new mongoose.Schema({
   },
 });
 
-optimisedDebtSchema.index({ from: 1, to: 1 }, { unique: true });
+optimisedDebtSchema.index({ groupId: 1, from: 1, to: 1 }, { unique: true });
 
 module.exports = mongoose.model("optimised_debt", optimisedDebtSchema);

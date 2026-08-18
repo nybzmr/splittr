@@ -1,201 +1,196 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "../styles/app.css";
 import { apiPath } from "../api";
-import AddUser from "./add_user";
+import AddExpense from "./add_expense";
 import GroupExpenses from "./group_expenses";
 import GroupUsers from "./group_users";
-import UserSwitching from "./user_switching";
+import Auth from "./auth";
+import GroupHome from "./group_home";
 
-async function request(path, options) {
-  const response = await fetch(apiPath(path), options);
-  const contentType = response.headers.get("content-type") || "";
-  const body = contentType.includes("application/json")
-    ? await response.json().catch(() => ({}))
-    : await response.text().catch(() => "");
+function authHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
-  if (!response.ok) {
-    const message = typeof body === "string"
-      ? body
-      : body.error || body.message;
-    throw new Error(message || "Request failed.");
-  }
-
-  return body;
+async function request(path, options = {}, token = "") {
+  const headers = { ...(options.headers || {}), ...authHeaders(token) };
+  const response = await fetch(apiPath(path), { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Request failed.");
+  return data;
 }
 
 function validUsers(users) {
   if (!Array.isArray(users)) return [];
-  return users.filter(
-    (user) =>
-      user &&
-      typeof user.username === "string" &&
-      user.username.trim().length > 0,
-  );
+  return users.filter((user) => user && typeof user.username === "string" && user.username.trim());
 }
 
 function validDebts(debts) {
   if (!Array.isArray(debts)) return [];
-  return debts.filter(
-    (debt) =>
-      debt &&
-      typeof debt.from === "string" &&
-      typeof debt.to === "string" &&
-      Number.isFinite(Number(debt.amount)),
-  );
+  return debts.filter((debt) => debt && typeof debt.from === "string" && typeof debt.to === "string" && Number.isFinite(Number(debt.amount)));
 }
 
 function validExpenses(expenses) {
   if (!Array.isArray(expenses)) return [];
-  return expenses.filter(
-    (expense) =>
-      expense &&
-      typeof expense.title === "string" &&
-      typeof expense.lender === "string" &&
-      Array.isArray(expense.borrowers) &&
-      Number.isFinite(Number(expense.amount)),
-  );
+  return expenses.filter((expense) => expense && typeof expense.title === "string" && typeof expense.lender === "string" && Array.isArray(expense.borrowers) && Number.isFinite(Number(expense.amount)));
 }
 
 function App() {
-  const [data, setData] = useState({ users: [], expenses: [], debts: [] });
-  const [activeUser, setActiveUser] = useState("");
+  const [token, setToken] = useState(() => localStorage.getItem("splittr_token") || "");
+  const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem("splittr_user") || "null"));
+  const [selectedGroupId, setSelectedGroupId] = useState(() => new URLSearchParams(window.location.search).get("group") || "");
+  const [data, setData] = useState({ group: null, users: [], expenses: [], debts: [], optimisedDebts: [], userDebts: [] });
+  const [groups, setGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [isOptimised, setIsOptimised] = useState(false);
 
+  const authOptions = useCallback(() => ({ headers: authHeaders(token) }), [token]);
+  const authHeaderFactory = useCallback(() => authHeaders(token), [token]);
+
+  const signOut = useCallback(() => {
+    localStorage.removeItem("splittr_token");
+    localStorage.removeItem("splittr_user");
+    localStorage.removeItem("splittr_group");
+    setToken("");
+    setCurrentUser(null);
+    setSelectedGroupId("");
+  }, []);
+
+  const refreshGroups = useCallback(async () => {
+    const list = await request("/groups", {}, token);
+    setGroups(Array.isArray(list) ? list : []);
+    return list;
+  }, [token]);
+
   const refreshData = useCallback(async () => {
+    if (!selectedGroupId) return false;
+    setIsLoading(true);
     try {
-      const [users, expenses, debts] = await Promise.all([
-        request("/users"), request("/expenses"), request("/debts"),
-      ]);
-      const usableUsers = validUsers(users);
-      const usableExpenses = validExpenses(expenses);
-      const usableDebts = validDebts(debts);
+      const dashboard = await request(`/groups/${selectedGroupId}/dashboard`, {}, token);
       setData({
-        users: usableUsers,
-        expenses: [...usableExpenses].reverse(),
-        debts: usableDebts,
+        group: dashboard.group,
+        users: validUsers(dashboard.users),
+        expenses: validExpenses(dashboard.expenses),
+        debts: validDebts(dashboard.debts),
+        optimisedDebts: validDebts(dashboard.optimisedDebts),
+        userDebts: Array.isArray(dashboard.userDebts) ? dashboard.userDebts : [],
       });
-      setActiveUser((current) =>
-        usableUsers.some((user) => user.username === current)
-          ? current
-          : usableUsers[0]?.username || "",
-      );
-      if (usableUsers.length !== (Array.isArray(users) ? users.length : 0)) {
-        setMessage("Some malformed user records were skipped. Each user needs a username.");
-      }
+      setIsOptimised(false);
+      setMessage("");
       return true;
     } catch (error) {
       setMessage(error.message);
+      if (error.message.toLowerCase().includes("not a member")) setSelectedGroupId("");
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedGroupId, token]);
 
-  useEffect(() => { refreshData(); }, [refreshData]);
+  useEffect(() => {
+    if (!token) { setIsLoading(false); return; }
+    refreshGroups().catch((error) => { setMessage(error.message); setIsLoading(false); });
+  }, [token, refreshGroups]);
 
-  const group = useMemo(() => {
-    const usersMinusActive = data.users.filter((user) => user.username !== activeUser);
-    const activeDebts = {};
-    let outstandingBalance = 0;
-    for (const debt of data.debts) {
-      if (debt.from === activeUser) {
-        outstandingBalance += debt.amount;
-        activeDebts[debt.to] = debt;
-      } else if (debt.to === activeUser) {
-        outstandingBalance -= debt.amount;
-        activeDebts[debt.from] = debt;
-      }
-    }
-    return {
-      name: "Expenses",
-      users: data.users,
-      activeUser,
-      expenses: data.expenses,
-      debts: data.debts,
-      usersMinusActive: { users: usersMinusActive, debts: activeDebts, outstandingBalance },
-    };
-  }, [data, activeUser]);
+  useEffect(() => {
+    if (!token || !selectedGroupId) { setIsLoading(false); return; }
+    refreshData();
+  }, [token, selectedGroupId, refreshData]);
 
-  async function addUser(username) {
-    try {
-      await request("/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, firstName: username, lastName: "Member" }),
-      });
-      const refreshed = await refreshData();
-      if (refreshed) setMessage("");
-      return refreshed;
-    } catch (error) {
-      setMessage(error.message);
-      return false;
-    }
+  function authenticated(payload) {
+    localStorage.setItem("splittr_token", payload.token);
+    localStorage.setItem("splittr_user", JSON.stringify(payload.user));
+    setToken(payload.token);
+    setCurrentUser(payload.user);
+  }
+
+  function selectGroup(groupId) {
+    localStorage.setItem("splittr_group", groupId);
+    setSelectedGroupId(groupId);
+    window.history.replaceState({}, "", `?group=${encodeURIComponent(groupId)}`);
+  }
+
+  function leaveGroupView() {
+    localStorage.removeItem("splittr_group");
+    setSelectedGroupId("");
+    window.history.replaceState({}, "", window.location.pathname);
   }
 
   async function addExpense(expense) {
     try {
-      await request("/expenses", {
+      await request(`/groups/${selectedGroupId}/expenses`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(expense),
-      });
-      setIsOptimised(false);
+      }, token);
       const refreshed = await refreshData();
       if (refreshed) setMessage("");
       return refreshed;
-    } catch (error) {
-      setMessage(error.message);
-      return false;
-    }
+    } catch (error) { setMessage(error.message); return false; }
   }
 
   async function settleDebt(settlement) {
     try {
-      await request("/debts/settle", {
+      const body = { ...settlement };
+      await request(`/groups/${selectedGroupId}/debts/settle`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settlement),
-      });
-      setIsOptimised(false);
+        body: JSON.stringify(body),
+      }, token);
       const refreshed = await refreshData();
       if (refreshed) setMessage("Settlement recorded.");
       return refreshed;
-    } catch (error) {
-      setMessage(error.message);
-      return false;
-    }
+    } catch (error) { setMessage(error.message); return false; }
   }
 
-  async function updateOptimisedDebts(isOptimised) {
-    try {
-      const debts = validDebts(await request(isOptimised ? "/optimisedDebts" : "/debts"));
-      setData((current) => ({ ...current, debts }));
-      setIsOptimised(isOptimised);
-      setMessage("");
-    } catch (error) {
-      setMessage(error.message);
+  const group = useMemo(() => {
+    const activeUser = currentUser?.username || "";
+    const usersMinusActive = data.users.filter((user) => user.username !== activeUser);
+    const activeDebts = {};
+    let outstandingBalance = 0;
+    for (const debt of (isOptimised ? data.optimisedDebts : data.debts)) {
+      if (debt.from === activeUser) { outstandingBalance += debt.amount; activeDebts[debt.to] = debt; }
+      else if (debt.to === activeUser) { outstandingBalance -= debt.amount; activeDebts[debt.from] = debt; }
     }
+    return {
+      name: data.group?.name || "Group",
+      groupId: selectedGroupId,
+      inviteCode: data.group?.inviteCode || "",
+      users: data.users,
+      activeUser,
+      expenses: data.expenses,
+      debts: isOptimised ? data.optimisedDebts : data.debts,
+      usersMinusActive: { users: usersMinusActive, debts: activeDebts, outstandingBalance },
+    };
+  }, [data, currentUser, selectedGroupId, isOptimised]);
+
+  if (!token || !currentUser) return <Auth onAuthenticated={authenticated} />;
+  if (!selectedGroupId) {
+    return (
+      <div className="App">
+        <div className="header-container">
+          <h1 className="title">Splittr</h1>
+          <div className="header-actions"><span>{currentUser.username}</span><button onClick={signOut} className="header-button">Sign out</button></div>
+        </div>
+        <GroupHome authOptions={authOptions} authHeaders={authHeaderFactory} onSelectGroup={selectGroup} />
+      </div>
+    );
   }
 
-  if (isLoading) return <div className="App"><div className="header-container"><h1 className="title">Splittr</h1></div></div>;
+  if (isLoading || !data.group) return <div className="App"><div className="header-container"><h1 className="title">Splittr</h1></div><p className="app-message">Loading group...</p></div>;
 
   return (
     <div className="App">
       <div className="header-container">
-        <h1 className="title">Splittr</h1>
-        {data.users.length > 0 && <UserSwitching group={group} onClick={setActiveUser} />}
+        <div className="header-left"><button className="header-button" onClick={leaveGroupView}>← Groups</button><h1 className="title">{group.name}</h1></div>
+        <div className="header-actions"><span>{currentUser.username}</span><button onClick={() => refreshData()} className="header-button">Refresh</button><button onClick={signOut} className="header-button">Sign out</button></div>
       </div>
       {message && <p className="app-message" role="status">{message}</p>}
-      {data.users.length === 0 ? (
-        <div className="main-content-container"><div className="group-members-container"><h1 className="group-members-title">Group Members</h1><div className="users-container"><AddUser onClick={addUser} /></div></div></div>
-      ) : (
-        <div className="main-content-container">
-          <GroupExpenses group={group} onClick={addExpense} />
-          <GroupUsers group={group} isOptimised={isOptimised} onClick={settleDebt} onToggle={updateOptimisedDebts} onAddUser={addUser} />
-        </div>
-      )}
+      <div className="invite-banner">Invite code: <strong>{group.inviteCode}</strong> <span>Share this code with another Splittr user.</span></div>
+      <div className="main-content-container">
+        <GroupExpenses group={group} onClick={addExpense} />
+        <GroupUsers group={group} isOptimised={isOptimised} onClick={settleDebt} onToggle={setIsOptimised} />
+      </div>
     </div>
   );
 }

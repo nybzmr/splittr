@@ -19,6 +19,12 @@ function isValidBorrowers(borrowers) {
 }
 
 const expenseSchema = new mongoose.Schema({
+  groupId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "group",
+    required: true,
+    index: true,
+  },
   title: {
     type: String,
     maxlength: [50, "Title must have 50 characters or fewer."],

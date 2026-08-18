@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     unique: true,
     lowercase: true,
+    trim: true,
     maxlength: [30, "Username must be within 30 characters."],
     required: true,
   },
@@ -16,6 +17,10 @@ const userSchema = new mongoose.Schema({
   lastName: {
     type: String,
     maxlength: [30, "Last name must have 30 characters or fewer."],
+    required: true,
+  },
+  passwordHash: {
+    type: String,
     required: true,
   },
   creationDatetime: {

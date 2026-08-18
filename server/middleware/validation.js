@@ -87,6 +87,16 @@ function normaliseBorrowers(borrowers) {
   });
 }
 
+function validateRegistration(request, _, next) {
+  request.body = {
+    username: normaliseUsername(request.body.username),
+    firstName: normaliseRequiredString(request.body.firstName, "First name", MAX_NAME_LENGTH),
+    lastName: normaliseRequiredString(request.body.lastName, "Last name", MAX_NAME_LENGTH),
+    password: typeof request.body.password === "string" ? request.body.password : "",
+  };
+  next();
+}
+
 function validateUser(request, _, next) {
   request.body = {
     username: normaliseUsername(request.body.username),
@@ -159,4 +169,5 @@ module.exports = {
   validateDebt,
   validateExpense,
   validateUser,
+  validateRegistration,
 };

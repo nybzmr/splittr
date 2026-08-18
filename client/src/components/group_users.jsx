@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/group_users.css";
 import User from "./user";
-import AddUser from "./add_user";
 import example from "../assets/Optimise.svg";
 
 function toPaise(value) {
@@ -73,10 +72,6 @@ function GroupUsers(props) {
     setResponseMsg(settled ? "Settlement recorded." : "Unable to settle this debt.");
   }
 
-  function addUserToGroup(user) {
-    return props.onAddUser(user);
-  }
-
   // Changes inline styles of smart split toggle
   function toggleSmartSplit() {
     props.onToggle(!props.isOptimised);
@@ -119,7 +114,7 @@ function GroupUsers(props) {
       <p className={msgClasses}>{responseMsg}</p>
       <div className="users-container">
         <div className="settle-container">
-          {props.isOptimised ? <p className="group-members-msg">Smart Split shows payment suggestions. Turn it off before recording a settlement.</p> : settleableUsers.length > 0 ? <div>
+          {props.isOptimised ? <p className="group-members-msg">Smart Split shows the optimized payment suggestions for this group.</p> : settleableUsers.length > 0 ? <div>
             <select name="users" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
               {settleableUsers.map((user) => (
                 <option key={user.username} value={user.username}>{user.username}</option>
@@ -154,11 +149,6 @@ function GroupUsers(props) {
             key={user.username}
           ></User>
         ))}
-        <AddUser
-          onClick={(user) => {
-            return addUserToGroup(user);
-          }}
-        ></AddUser>
       </div>
     </div>
   );
