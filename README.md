@@ -116,3 +116,17 @@ running this version.
 The server now runs `syncIndexes()` for the group-aware collections on startup. This removes obsolete pre-group unique indexes (for example a global `username` or `(from,to)` index) and creates the current compound indexes scoped by `groupId`.
 
 Restart the backend after updating to this version. For this college project, keep a backup of the development database before applying schema/index changes.
+
+## Current features
+
+- Public landing page for signed-out users with login/sign-up entry points.
+- Username/password authentication and protected group workspaces.
+- Create/join groups using invite codes.
+- Group-scoped expenses, debts, balances, and Smart Split.
+- Smart Split preference is shared per group and synchronized between open clients by lightweight polling.
+- Edit and delete expense support with transactional ledger rebuilds.
+- Clear/settle debt controls.
+- Leave group when the signed-in user's net balance is zero.
+- Delete group when every member has a zero net balance (owner only).
+- Profile editing for first/last name and password.
+- Responsive, consistent UI with custom member pickers for expense entry.

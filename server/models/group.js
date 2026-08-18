@@ -22,6 +22,10 @@ const groupSchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  smartSplitEnabled: {
+    type: Boolean,
+    default: false,
+  },
   creationDatetime: {
     type: Date,
     default: Date.now,

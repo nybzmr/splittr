@@ -48,3 +48,31 @@ exports.me = async (request, response) => {
 exports.updatePasswordHashRequirementNote = async function () {
   await userDebtModel.deleteMany({});
 };
+
+
+exports.updateProfile = async (request, response) => {
+  const { firstName, lastName, password } = request.body;
+  const updates = {};
+
+  if (firstName !== undefined) {
+    const value = String(firstName).trim();
+    if (!value) return response.status(400).json({ error: "First name cannot be empty." });
+    updates.firstName = value;
+  }
+  if (lastName !== undefined) {
+    const value = String(lastName).trim();
+    if (!value) return response.status(400).json({ error: "Last name cannot be empty." });
+    updates.lastName = value;
+  }
+  if (password !== undefined && password !== "") {
+    if (String(password).length < 6) return response.status(400).json({ error: "Password must have at least 6 characters." });
+    updates.passwordHash = await bcrypt.hash(String(password), 10);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return response.status(400).json({ error: "No profile changes were provided." });
+  }
+
+  const user = await userModel.findByIdAndUpdate(request.user._id, updates, { new: true, runValidators: true });
+  response.json({ user: publicUser(user) });
+};

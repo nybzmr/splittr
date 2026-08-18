@@ -8,5 +8,6 @@ const router = express.Router();
 router.post("/auth/register", validateRegistration, asyncHandler(authController.register));
 router.post("/auth/login", asyncHandler(authController.login));
 router.get("/auth/me", requireAuth, asyncHandler(authController.me));
+router.patch("/auth/me", requireAuth, asyncHandler(authController.updateProfile));
 router.use(errorHandler);
 module.exports = router;
