@@ -165,9 +165,31 @@ function validateExpense(request, _, next) {
   next();
 }
 
+function validateExpenseUpdate(request, _, next) {
+  const borrowers = normaliseBorrowers(request.body.borrowers);
+  const amount = normalisePositivePaise(request.body.amount);
+  const borrowerSum = borrowers.reduce((sum, borrower) => sum + borrower[1], 0);
+  if (borrowerSum > amount) throw new RequestValidationError("The sum of amounts owed cannot exceed the total expense amount.");
+  const lender = normaliseUsername(request.body.lender, "Lender username");
+  const borrowerNames = new Set();
+  for (const [username] of borrowers) {
+    if (username === lender) throw new RequestValidationError("The lender cannot also be a borrower.");
+    if (borrowerNames.has(username)) throw new RequestValidationError("Each borrower can only be included once.");
+    borrowerNames.add(username);
+  }
+  request.body = {
+    title: normaliseRequiredString(request.body.title, "Title", MAX_TITLE_LENGTH),
+    lender,
+    borrowers,
+    amount,
+  };
+  next();
+}
+
 module.exports = {
   validateDebt,
   validateExpense,
+  validateExpenseUpdate,
   validateUser,
   validateRegistration,
 };

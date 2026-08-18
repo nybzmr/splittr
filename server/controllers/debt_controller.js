@@ -65,6 +65,9 @@ exports.deleteDebtBetweenUsers = async (request, response) => {
   const groupId = request.groupId;
   const from = request.params.from.toLowerCase();
   const to = request.params.to.toLowerCase();
+  if (request.user.username !== from && request.user.username !== to) {
+    return response.status(403).json({ error: "Only a user involved in this debt can clear it." });
+  }
   const result = await helpers.withTransaction(async (session) => {
     const debt = await debtModel.findOne({ groupId, from, to }).session(session);
     if (!debt) return { status: 404, message: "Debt not found." };

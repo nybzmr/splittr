@@ -1,138 +1,72 @@
-import { React, useState } from "react";
+import React, { useState } from "react";
 import "../styles/expense.css";
-import smallArrow from "../assets/small_arrow.svg";
 
-function Expense(props) {
-  let [dynamicHeight, setDynamicHeight] = useState(0);
-  let [textOverflow, setTextOverflow] = useState(0);
+function formatMoney(paise) {
+  return `₹${(paise / 100).toFixed(2)}`;
+}
 
-  // Calculate conatiner height based on number of borrowers
-  function expandContainer() {
-    if (dynamicHeight) {
-      setDynamicHeight(0);
-    } else {
-      let nextHeight = 0;
-      for (let i = 0; i < props.value.borrowers.length; i++) {
-        if (i % 4 === 0) {
-          nextHeight += 1.86;
-        }
-      }
-      setDynamicHeight(nextHeight);
-    }
-  }
-
-  // Format borrowers with commas
-  function renderBorrowers() {
-    if (props.value.borrowers.length > 1) {
-      return props.value.borrowers.length + " users";
-    } else {
-      return props.value.borrowers[0][0];
-    }
-  }
-
-  // Check if borrower text is truncated
-  function checkTextOverflow(e) {
-    if (e.target.offsetWidth < e.target.scrollWidth) {
-      setTextOverflow(100);
-      return 100;
-    } else {
-      setTextOverflow(0);
-      return 0;
-    }
-  }
+function Expense({ value, currentUser, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  const isAuthor = value.author === currentUser;
+  const isSettlement = value.title === "SETTLEMENT";
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div onClick={expandContainer}>
-      <div className="expense">
-        <div className="e-date">
-          {(props.value.creationDatetime || "").substring(0, 10)}
+    <article className="expense-card">
+      <button type="button" className="expense-summary" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+        <div className="expense-date">
+          <span>{new Date(value.creationDatetime).toLocaleDateString(undefined, { month: "short" })}</span>
+          <strong>{new Date(value.creationDatetime).getDate()}</strong>
         </div>
-        <div className="e-pic"></div>
-        <div className="e-title">{props.value.title}</div>
-        <div className="e-member-price">
-          <div className="e-price">
-            ₹{(props.value.amount / 100).toFixed(2)}
+        <div className="expense-main">
+          <div className="expense-title-row">
+            <h3>{value.title}</h3>
+            {isSettlement && <span className="tag tag-neutral">Settlement</span>}
           </div>
-          <div className="e-members">
-            <div>{props.value.lender}</div>
-            <img alt="arrow" className="e-arrow" src={smallArrow}></img>
-            <div
-              onMouseEnter={checkTextOverflow}
-              onMouseLeave={() => setTextOverflow(0)}
-              style={{
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {renderBorrowers()}
+          <p>{value.lender} paid · {value.borrowers.length} participant{value.borrowers.length === 1 ? "" : "s"}</p>
+        </div>
+        <div className="expense-amount">{formatMoney(value.amount)}</div>
+        <div className={`expense-chevron ${expanded ? "expanded" : ""}`}>⌄</div>
+      </button>
+
+      {expanded && (
+        <div className="expense-details">
+          <div className="expense-detail-head">
+            <div>
+              <span className="eyebrow">Paid by</span>
+              <strong>{value.lender}</strong>
+            </div>
+            <div>
+              <span className="eyebrow">Added by</span>
+              <strong>{value.author}</strong>
             </div>
           </div>
-        </div>
-        <div
-          style={{
-            justifySelf: "center",
-            backgroundColor: "lightgrey",
-            borderRadius: "5px",
-            width: "1em",
-            height: "1.2em",
-            padding: "0.1em",
-          }}
-        >
-          <img
-            style={{
-              width: "1em",
-              height: "1.2em",
-              transform: "rotateZ(90deg)",
-            }}
-            alt="arrow"
-            src={smallArrow}
-          ></img>
-        </div>
-        <div className="expense-hover" style={{ opacity: textOverflow }}>
-          {props.value.lender}
-          <img
-            style={{
-              textAlign: "center",
-            }}
-            alt="arrow"
-            className="e-arrow"
-            src={smallArrow}
-          ></img>
-          {renderBorrowers()}
-        </div>
-      </div>
-      <div
-        style={{
-          maxHeight: dynamicHeight + "em",
-          display: "flex",
-          flexFlow: "wrap",
-          paddingBottom: "0.2em",
-        }}
-        className="expand-expense"
-      >
-        {props.value.borrowers.map((borrower, index) => {
-          return (
-            <div key={borrower[0] + index} className="e-member-price">
-              <div
-                className="e-members"
-                style={{
-                  width: "auto",
-                  margin: "0.3em",
-                  backgroundColor: "lightgrey",
-                }}
-              >
-                {borrower[0]}
-                <img alt="arrow" className="e-arrow" src={smallArrow}></img>
-                <div className="e-price">
-                  {"₹" + (borrower[1] / 100).toFixed(2)}
-                </div>
+          <div className="expense-split-list">
+            {value.borrowers.map(([user, amount], index) => (
+              <div className="expense-split-row" key={`${user}-${index}`}>
+                <span>{user}</span><strong>{formatMoney(amount)}</strong>
               </div>
+            ))}
+          </div>
+          {isAuthor && !isSettlement && (
+            <div className="expense-actions">
+              {confirmDelete ? (
+                <>
+                  <span className="confirm-text">Delete this expense?</span>
+                  <button className="button button-danger" onClick={() => onDelete(value._id)}>Delete</button>
+                  <button className="button button-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button className="button button-secondary" onClick={() => onEdit(value)}>Edit</button>
+                  <button className="button button-danger-ghost" onClick={() => setConfirmDelete(true)}>Delete</button>
+                </>
+              )}
             </div>
-          );
-        })}
-      </div>
-    </div>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 

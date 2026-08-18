@@ -129,3 +129,23 @@ exports.simplifyDebts = async function (groupId, session = null) {
     await optimisedDebtModel.insertMany(optimisedDebts, { session, ordered: true });
   }
 };
+
+exports.rebuildGroupLedger = async function (groupId, session = null) {
+  const expenseModel = require("../../models/expense");
+  await debtModel.deleteMany({ groupId }, getSessionOptions(session));
+  await userDebtModel.deleteMany({ groupId }, getSessionOptions(session));
+  await optimisedDebtModel.deleteMany({ groupId }, getSessionOptions(session));
+
+  const expenses = await withSession(
+    expenseModel.find({ groupId }).sort({ creationDatetime: 1 }),
+    session,
+  );
+
+  for (const expense of expenses) {
+    for (const [borrower, owedAmount] of expense.borrowers) {
+      await exports.processNewDebt(groupId, borrower, expense.lender, owedAmount, session);
+    }
+  }
+
+  await exports.simplifyDebts(groupId, session);
+};

@@ -1,157 +1,48 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../styles/group_users.css";
-import User from "./user";
-import example from "../assets/Optimise.svg";
 
-function toPaise(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.round(number * 100) : 0;
-}
+function formatMoney(paise) { return `₹${(paise / 100).toFixed(2)}`; }
 
 function GroupUsers(props) {
   const [settleAmount, setSettleAmount] = useState("");
   const [selectedUser, setSelectedUser] = useState("");
-  const [responseMsg, setResponseMsg] = useState("");
-  const [msgClasses, setMsgClasses] = useState("group-members-msg");
+  const [busy, setBusy] = useState(false);
 
-  const settleableUsers = useMemo(() => props.group.usersMinusActive.users.filter((user) => {
-    const debt = props.group.usersMinusActive.debts[user.username];
-    return debt && debt.from === user.username && debt.to === props.group.activeUser;
-  }), [props.group.usersMinusActive.users, props.group.usersMinusActive.debts, props.group.activeUser]);
-  const selectedDebt = props.group.usersMinusActive.debts[selectedUser];
-  const settleAmountInPaise = toPaise(settleAmount);
-  const canSettle =
-    selectedUser &&
-    settleAmountInPaise > 0 &&
-    selectedDebt &&
-    settleAmountInPaise <= selectedDebt.amount;
+  const debtMap = props.group.usersMinusActive.debts;
+  const people = props.group.usersMinusActive.users;
+  const settleableUsers = useMemo(() => people.filter((user) => { const debt = debtMap[user.username]; return debt && debt.from === user.username && debt.to === props.group.activeUser; }), [people, debtMap, props.group.activeUser]);
+  const selectedDebt = debtMap[selectedUser];
+  const amount = Math.round(Number(settleAmount || 0) * 100);
+  const canSettle = !!selectedDebt && amount > 0 && amount <= selectedDebt.amount;
 
-  useEffect(() => {
-    setSelectedUser((current) =>
-      settleableUsers.some((user) => user.username === current)
-        ? current
-        : settleableUsers[0]?.username || "",
-    );
-  }, [settleableUsers]);
+  useEffect(() => { if (!settleableUsers.some((u) => u.username === selectedUser)) setSelectedUser(settleableUsers[0]?.username || ""); }, [settleableUsers, selectedUser]);
 
-  useEffect(() => {
-    if (!responseMsg) return undefined;
-    setMsgClasses("group-members-msg");
-    const timer = setTimeout(() => {
-      setMsgClasses("group-members-msg group-members-msg-fade");
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [responseMsg]);
-
-  // Returns styles to grey out button
-  function disabledBtnStyles() {
-    if (!canSettle) {
-      return {
-        backgroundColor: "lightgrey",
-        boxShadow: "0 5px 0 grey",
-        transform: "none",
-        opacity: "20%",
-      };
-    }
-  }
-
-  // Submit a settlement through the parent, which refreshes all ledger data.
   async function settleUp() {
-    if (!canSettle) return;
-    // Creates object to send in body
-    const settleObject = {
-      from: selectedUser,
-      to: props.group.activeUser,
-      amount: settleAmountInPaise,
-    };
-
-    // Disable and clear form
-    setSettleAmount("");
-
-    const settled = await props.onClick(settleObject);
-    setResponseMsg(settled ? "Settlement recorded." : "Unable to settle this debt.");
+    if (!canSettle || busy) return;
+    setBusy(true);
+    const ok = await props.onClick({ from: selectedUser, to: props.group.activeUser, amount });
+    if (ok) setSettleAmount("");
+    setBusy(false);
   }
 
-  // Changes inline styles of smart split toggle
-  function toggleSmartSplit() {
-    props.onToggle(!props.isOptimised);
+  async function clearDebt(debt) {
+    if (!window.confirm(`Clear ${formatMoney(debt.amount)} owed by ${debt.from} to ${debt.to}?`)) return;
+    await props.onClearDebt(debt);
   }
 
-  return (
-    <div className="group-members-container">
-      <div className="toggle-container">
-        <div className="info-div">
-          i
-          <div className="info-hover">
-            Optimises debts to minimise transactions
-            <img
-              alt="Smart Split Explanation"
-              style={{
-                paddingTop: "0.5em",
-                width: "25em",
-                height: "10em",
-              }}
-              src={example}
-            ></img>
-          </div>
-        </div>
-        <div>
-          <button type="button" className="split-toggle" aria-pressed={props.isOptimised} onClick={toggleSmartSplit}>
-            <div
-              className="circle-toggle"
-              style={{
-                marginLeft: props.isOptimised ? "1.7em" : "0.3em",
-                backgroundColor: props.isOptimised
-                  ? "rgb(61, 201, 112, 0.65)"
-                  : "rgb(201, 61, 61, 0.65)",
-                }}
-            ></div>
-          </button>
-          <p className="toggle-header">Smart Split </p>
-        </div>
-      </div>
-      <h1 className="group-members-title">Group Members</h1>
-      <p className={msgClasses}>{responseMsg}</p>
-      <div className="users-container">
-        <div className="settle-container">
-          {props.isOptimised ? <p className="group-members-msg">Smart Split shows the optimized payment suggestions for this group.</p> : settleableUsers.length > 0 ? <div>
-            <select name="users" value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
-              {settleableUsers.map((user) => (
-                <option key={user.username} value={user.username}>{user.username}</option>
-              ))}
-            </select>
-            <input
-              onChange={(e) => {
-                setSettleAmount(e.target.value);
-              }}
-              value={settleAmount}
-              type="number"
-              placeholder="₹"
-              min={0}
-              step="0.01"
-              max={selectedDebt ? (selectedDebt.amount / 100).toFixed(2) : undefined}
-            ></input>
-          </div> : <p className="group-members-msg">No one currently owes {props.group.activeUser}.</p>}
-          {!props.isOptimised && selectedDebt && settleAmountInPaise > selectedDebt.amount && <p className="group-members-msg">Amount is higher than this debt.</p>}
-          {!props.isOptimised && settleableUsers.length > 0 && <button
-            disabled={!canSettle}
-            style={disabledBtnStyles()}
-            onClick={settleUp}
-            className="ge-button"
-          >
-            Settle Up
-          </button>}
-        </div>
-        {props.group.usersMinusActive.users.map((user) => (
-          <User
-            group={props.group.usersMinusActive}
-            user={user}
-            key={user.username}
-          ></User>
-        ))}
-      </div>
-    </div>
-  );
+  return <section className="panel members-panel">
+    <div className="panel-header members-header"><div><span className="eyebrow">Balances</span><h2>Group members</h2><p>See who owes you and settle directly.</p></div><label className="smart-toggle"><span>Smart Split</span><input type="checkbox" checked={props.isOptimised} onChange={(e) => props.onToggle(e.target.checked)} /><span className="toggle-track"><span /></span></label></div>
+    {props.isOptimised && <div className="smart-summary"><div><span>Current</span><strong>{props.group.debts.length}</strong><small>payments</small></div><div className="smart-arrow">→</div><div><span>Optimized</span><strong>{props.group.optimisedDebts.length}</strong><small>payments</small></div><div className="smart-note">Smart Split reduces the number of transfers needed to settle the group.</div></div>}
+
+    {!props.isOptimised && settleableUsers.length > 0 && <div className="settle-card"><div><span className="eyebrow">Settle a debt</span><strong>{selectedUser} owes you {selectedDebt ? formatMoney(selectedDebt.amount) : ""}</strong></div><div className="settle-form"><select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>{settleableUsers.map((u) => <option key={u.username}>{u.username}</option>)}</select><input value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} type="number" min="0.01" step="0.01" placeholder="Amount" /><button className="button button-primary" disabled={!canSettle || busy} onClick={settleUp}>{busy ? "Saving…" : "Settle"}</button></div></div>}
+
+    {people.length === 0 ? <div className="empty-state"><strong>No other members</strong><span>Invite someone to start sharing expenses.</span></div> : <div className="member-list">{people.map((user) => {
+      const debt = debtMap[user.username];
+      const owesYou = debt && debt.from === user.username;
+      const youOwe = debt && debt.to === user.username;
+      return <div className="member-row" key={user.username}><div className="avatar">{user.username[0]?.toUpperCase()}</div><div className="member-info"><strong>{user.username}</strong><span>{user.firstName} {user.lastName}</span></div><div className={`member-balance ${owesYou ? "positive" : youOwe ? "negative" : "neutral"}`}>{owesYou ? <><span>owes you</span><strong>{formatMoney(debt.amount)}</strong></> : youOwe ? <><span>you owe</span><strong>{formatMoney(debt.amount)}</strong></> : <span>settled</span>}</div>{!props.isOptimised && (owesYou || youOwe) && <button className="icon-action" title="Clear debt" onClick={() => clearDebt(debt)}>✓</button>}</div>;
+    })}</div>}
+  </section>;
 }
 
 export default GroupUsers;
