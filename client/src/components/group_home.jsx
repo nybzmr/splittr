@@ -7,8 +7,8 @@ async function request(path, options = {}) { const response = await fetch(apiPat
 function GroupHome(props) {
   const guest = Boolean(props.guest);
   const [groups, setGroups] = useState(props.groups || []); const [groupName, setGroupName] = useState(""); const [inviteCode, setInviteCode] = useState(""); const [message, setMessage] = useState(""); const [busyAction, setBusyAction] = useState("");
-  async function loadGroups() { if (guest) return; try { const list = await request("/groups", props.authOptions()); setGroups(list); setMessage(""); } catch (e) { setMessage(e.message); } }
-  useEffect(() => { loadGroups(); }, [props.groups, guest]);
+  const loadGroups = async () => { if (guest) return; try { const list = await request("/groups", props.authOptions()); setGroups(list); setMessage(""); } catch (e) { setMessage(e.message); } };
+  useEffect(() => { loadGroups(); }, [props.groups, guest, loadGroups]);
   useEffect(() => { setGroups(props.groups || []); }, [props.groups]);
 
   function requireAuth() { props.onRequireAuth?.("login"); }
