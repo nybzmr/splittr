@@ -124,7 +124,7 @@ function App() {
   };
 
   const action = async (fn, success = "Saved.") => {
-    try { const result = await fn(); const refreshed = await refreshData(); if (refreshed) { setMessage(success); setMessageType("success"); } return refreshed; }
+    try { await fn(); const refreshed = await refreshData(); if (refreshed) { setMessage(success); setMessageType("success"); } return refreshed; }
     catch (e) { setMessage(e.message); setMessageType("error"); return false; }
   };
 
