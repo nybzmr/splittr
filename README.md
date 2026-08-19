@@ -1,46 +1,299 @@
 # Splittr
 
-Splittr is a college-level MERN expense-sharing app for small groups. Users can
-create accounts, create or join groups with an invite code, add shared
-expenses, track debts, record settlements, and view Smart Split suggestions
-that reduce the number of payments needed to balance a group.
+**Splittr** is a college-level MERN expense-sharing application for small groups. It helps friends, roommates, and travel groups manage shared expenses, track debts, settle balances, and reduce the number of payments required through a heap-based **Smart Split** algorithm.
 
-## Current Features
+### Live Demo
 
-- Username/password authentication with JWT
-- Create a group and receive an invite code
-- Join an existing group using the invite code
-- Group-scoped expenses, debts, balances, and Smart Split data
-- Shared group page: every member sees the same group ledger
-- Automatic expense splitting
-- Partial and full debt settlement
-- Heap-based Smart Split optimization
-- Integer-paise money representation
-- MongoDB transactions for financial mutations
+**Frontend:** [https://splittr-virid.vercel.app/](https://splittr-virid.vercel.app/)
+
+**Backend API:** [https://splittr-tf3n.onrender.com/](https://splittr-tf3n.onrender.com/)
+
+---
+
+## Features
+
+### Authentication
+
+* Username/password registration and login
+* JWT-based authentication
+* Protected group and financial operations
+* Profile management
+* Update first name, last name, and password
+* Signed-out users can browse the public landing page
+
+### Groups
+
+* Create groups with unique invite codes
+* Join existing groups using invite codes
+* Group-scoped members, expenses, debts, and balances
+* Shared workspace for all members of the same group
+* Leave a group when your net balance is zero
+* Delete a group as the owner when all members have zero balances
+
+### Expense Management
+
+* Create shared expenses
+* Automatic expense splitting
+* Custom borrower amounts
+* Edit existing expenses
+* Delete expenses
+* Transactional recalculation of debts and balances after edits/deletions
+* Integer-paise representation for exact monetary calculations
+
+### Debt & Settlement Management
+
+* Track direct debts between group members
+* View each member's net balance
+* Partial debt settlement
+* Full debt settlement
+* Clear outstanding debts
+* Transactional financial updates
+* Validation to prevent invalid or excessive settlements
+
+### Smart Split
+
+Splittr maintains a debt graph and derives a simplified settlement graph from users' net balances.
+
+The Smart Split algorithm:
+
+```text
+Expenses
+   ↓
+Pairwise debts
+   ↓
+Net balances
+   ↓
+Debtors + Creditors
+   ↓
+Heap-based optimization
+   ↓
+Reduced settlement transactions
+```
+
+For example:
+
+```text
+Before optimization: 8 payments
+After optimization:  5 payments
+
+3 payments eliminated
+```
+
+Smart Split is stored **per group**, so every member of a group sees the same Smart Split setting and settlement recommendations.
+
+The current synchronization uses lightweight polling so that multiple open clients converge on the same group state without introducing unnecessary real-time infrastructure.
+
+---
+
+## Architecture
+
+```text
+                    ┌─────────────────────┐
+                    │      React          │
+                    │      Frontend       │
+                    │      Vercel         │
+                    └──────────┬──────────┘
+                               │ HTTPS
+                               ▼
+                    ┌─────────────────────┐
+                    │     Express.js      │
+                    │      REST API       │
+                    │       Render        │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │      MongoDB        │
+                    │       Atlas         │
+                    └─────────────────────┘
+```
+
+The backend is organized around:
+
+```text
+server/
+├── controllers/
+├── middleware/
+├── models/
+├── routes/
+├── services/
+└── server.js
+```
+
+The frontend contains:
+
+```text
+client/
+└── src/
+    ├── components/
+    ├── styles/
+    └── assets/
+```
+
+---
 
 ## Tech Stack
 
-- Frontend: React, JavaScript, CSS
-- Backend: Node.js, Express.js
-- Database: MongoDB with Mongoose
-- Authentication: JWT + bcryptjs
-- Algorithm: heap-based Smart Split debt optimization
+### Frontend
 
-## Local Setup
+* React
+* JavaScript
+* CSS
+* Create React App
 
-Prerequisites:
+### Backend
 
-- Node.js 18+
-- npm
-- MongoDB Atlas or another MongoDB deployment that supports transactions
+* Node.js
+* Express.js
+* REST APIs
+* JWT authentication
+* bcryptjs
 
-1. Copy the environment file:
+### Database
 
-```bash
-cp server/.env.example server/.env
+* MongoDB
+* Mongoose
+* MongoDB transactions
+* Compound/group-scoped indexes
+
+### Algorithms & Engineering
+
+* Heap-based debt minimization
+* Integer arithmetic for monetary values
+* Transactional state updates
+* Input validation
+* Error handling
+* Git/GitHub
+
+---
+
+## Money Representation
+
+All persisted financial amounts use **integer paise** rather than floating-point rupee values.
+
+For example:
+
+```text
+₹90.00 → 9000 paise
+₹125.50 → 12550 paise
 ```
 
-Set:
+This avoids floating-point precision problems when calculating balances and settlements.
+
+---
+
+## Database Model
+
+Financial state is scoped to a group.
+
+Conceptually:
+
+```text
+User
+ └── Group Membership
+        └── Group
+             ├── Expenses
+             ├── Debts
+             ├── User Balances
+             └── Smart Split State
+```
+
+This prevents data from different groups from being mixed together.
+
+The server also synchronizes MongoDB indexes on startup so that obsolete indexes from the earlier global-ledger version do not conflict with the group-aware schema.
+
+---
+
+## Financial Consistency
+
+State-changing financial operations use MongoDB transactions.
+
+For example, creating an expense can update:
+
+```text
+Expense
+   +
+Pairwise Debts
+   +
+User Net Balances
+   +
+Smart Split
+```
+
+as one atomic operation.
+
+Likewise, settlements update the relevant debt and balances transactionally.
+
+This prevents partially applied financial operations.
+
+---
+
+## API
+
+### Authentication
+
+| Method  | Endpoint         | Purpose                    |
+| ------- | ---------------- | -------------------------- |
+| `POST`  | `/auth/register` | Create an account          |
+| `POST`  | `/auth/login`    | Sign in                    |
+| `GET`   | `/auth/me`       | Get the authenticated user |
+| `PATCH` | `/auth/me`       | Update profile             |
+
+### Groups
+
+| Method   | Endpoint                       | Purpose                                          |
+| -------- | ------------------------------ | ------------------------------------------------ |
+| `GET`    | `/groups`                      | List groups for the authenticated user           |
+| `POST`   | `/groups`                      | Create a group                                   |
+| `POST`   | `/groups/join`                 | Join using an invite code                        |
+| `GET`    | `/groups/:groupId/dashboard`   | Get group members, expenses, debts, and balances |
+| `POST`   | `/groups/:groupId/leave`       | Leave a group                                    |
+| `DELETE` | `/groups/:groupId`             | Delete a group                                   |
+| `PATCH`  | `/groups/:groupId/smart-split` | Update the group's Smart Split setting           |
+
+### Expenses
+
+| Method   | Endpoint                               | Purpose           |
+| -------- | -------------------------------------- | ----------------- |
+| `POST`   | `/groups/:groupId/expenses`            | Create an expense |
+| `PATCH`  | `/groups/:groupId/expenses/:expenseId` | Edit an expense   |
+| `DELETE` | `/groups/:groupId/expenses/:expenseId` | Delete an expense |
+
+### Debts
+
+| Method   | Endpoint                           | Purpose                     |
+| -------- | ---------------------------------- | --------------------------- |
+| `GET`    | `/groups/:groupId/debts`           | Get direct debts            |
+| `GET`    | `/groups/:groupId/optimisedDebts`  | Get Smart Split suggestions |
+| `POST`   | `/groups/:groupId/debts/settle`    | Record a settlement         |
+| `DELETE` | `/groups/:groupId/debts/:from/:to` | Clear a debt                |
+
+---
+
+## Local Development
+
+### Prerequisites
+
+* Node.js 18+
+* npm
+* MongoDB Atlas or another MongoDB deployment that supports transactions
+
+### Clone
+
+```bash
+git clone https://github.com/nybzmr/splittr.git
+cd splittr
+```
+
+### Backend
+
+Create:
+
+```text
+server/.env
+```
+
+using:
 
 ```text
 MONGODB_URI=<mongodb-connection-string>
@@ -49,7 +302,7 @@ CORS_ORIGIN=http://localhost:3000
 JWT_SECRET=<long-random-secret>
 ```
 
-2. Install/start backend:
+Install dependencies:
 
 ```bash
 cd server
@@ -57,7 +310,15 @@ npm install
 npm start
 ```
 
-3. Install/start frontend in another terminal:
+The backend runs on:
+
+```text
+http://localhost:3001
+```
+
+### Frontend
+
+Open another terminal:
 
 ```bash
 cd client
@@ -65,68 +326,109 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000`.
-
-## Group Workflow
-
-1. Register a Splittr account.
-2. Sign in.
-3. Create a group.
-4. Share the generated invite code.
-5. Another authenticated user signs in and enters the invite code.
-6. Both users can select the same group and see the same members, expenses,
-debts, balances, and Smart Split state.
-
-## Money Representation
-
-Amounts are represented as integer paise. For example:
+The frontend runs on:
 
 ```text
-₹90.00 -> 9000
+http://localhost:3000
 ```
 
-This avoids floating-point errors when updating financial state.
+---
 
-## API Overview
+## Production Deployment
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| POST | `/auth/register` | Create account |
-| POST | `/auth/login` | Sign in |
-| GET | `/auth/me` | Get authenticated user |
-| GET | `/groups` | List groups for current user |
-| POST | `/groups` | Create group |
-| POST | `/groups/join` | Join using invite code |
-| GET | `/groups/:groupId/dashboard` | Get group ledger + members |
-| POST | `/groups/:groupId/expenses` | Create expense |
-| GET | `/groups/:groupId/debts` | Get direct debts |
-| GET | `/groups/:groupId/optimisedDebts` | Get Smart Split suggestions |
-| POST | `/groups/:groupId/debts/settle` | Record settlement |
-| DELETE | `/groups/:groupId/debts/:from/:to` | Clear a debt |
+Splittr is deployed using:
 
-## Important Note
+```text
+Frontend → Vercel
+Backend  → Render
+Database → MongoDB Atlas
+```
 
-This version introduces group-scoped financial data. Existing databases created
-by the earlier global-ledger version need migration or a fresh database before
-running this version.
+## Environment Variables
 
+### Backend
 
-## Existing MongoDB database after group support
+```text
+MONGODB_URI
+PORT
+CORS_ORIGIN
+JWT_SECRET
+```
 
-The server now runs `syncIndexes()` for the group-aware collections on startup. This removes obsolete pre-group unique indexes (for example a global `username` or `(from,to)` index) and creates the current compound indexes scoped by `groupId`.
+### Frontend
 
-Restart the backend after updating to this version. For this college project, keep a backup of the development database before applying schema/index changes.
+```text
+REACT_APP_API_URL
+```
 
-## Current features
+For production:
 
-- Public landing page for signed-out users with login/sign-up entry points.
-- Username/password authentication and protected group workspaces.
-- Create/join groups using invite codes.
-- Group-scoped expenses, debts, balances, and Smart Split.
-- Smart Split preference is shared per group and synchronized between open clients by lightweight polling.
-- Edit and delete expense support with transactional ledger rebuilds.
-- Clear/settle debt controls.
-- Leave group when the signed-in user's net balance is zero.
-- Delete group when every member has a zero net balance (owner only).
-- Profile editing for first/last name and password.
-- Responsive, consistent UI with custom member pickers for expense entry.
+```text
+REACT_APP_API_URL=https://splittr-tf3n.onrender.com
+```
+
+Do not commit `.env` files or real secrets.
+
+---
+
+## Typical Workflow
+
+```text
+1. Sign up / Sign in
+        ↓
+2. Create a group
+        ↓
+3. Share invite code
+        ↓
+4. Other users join
+        ↓
+5. Add shared expenses
+        ↓
+6. Track debts and balances
+        ↓
+7. Enable Smart Split
+        ↓
+8. View optimized settlements
+        ↓
+9. Settle / clear debts
+        ↓
+10. Leave or close the group
+```
+
+---
+
+## Data Migration Note
+
+This version introduces **group-scoped financial data**.
+
+Databases created by the older global-ledger version may require migration or a fresh development database.
+
+The server runs MongoDB `syncIndexes()` for group-aware collections on startup to repair obsolete indexes. Keep a backup before applying schema/index changes to an existing database.
+
+---
+
+## Project Status
+
+Splittr is currently a **college-level full-stack project** focused on:
+
+* backend correctness
+* financial state management
+* database transactions
+* authentication
+* group-based data isolation
+* algorithmic debt optimization
+* practical React UI/UX
+
+The project intentionally avoids unnecessary distributed infrastructure and keeps the architecture understandable and maintainable.
+
+---
+
+## Repository
+
+**GitHub:** [https://github.com/nybzmr/splittr](https://github.com/nybzmr/splittr)
+
+---
+
+<p align="center">
+  Made by <strong>Nayaab Zameer</strong>
+</p>
